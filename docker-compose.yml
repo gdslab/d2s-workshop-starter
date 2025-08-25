@@ -2,7 +2,7 @@ services:
   frontend:
     image: d2s-app:latest
     platform: linux/x86_64
-    restart: always
+    restart: unless-stopped
     depends_on:
       - backend
     env_file:
@@ -14,7 +14,7 @@ services:
     volumes:
       - tusd-data:/srv/tusd-data/data
       - user-data:/static
-    restart: always
+    restart: unless-stopped
     depends_on:
       db:
         condition: service_healthy
@@ -28,10 +28,9 @@ services:
 
   db:
     image: postgis/postgis:15-3.3
-    platform: linux/x86_64
     volumes:
       - db-data:/var/lib/postgresql/data
-    restart: always
+    restart: unless-stopped
     healthcheck:
       test:
         [
@@ -48,8 +47,7 @@ services:
 
   redis:
     image: redis:alpine
-    platform: linux/x86_64
-    restart: always
+    restart: unless-stopped
 
   celery_worker:
     image: d2s-api:latest
@@ -58,7 +56,7 @@ services:
     volumes:
       - tusd-data:/srv/tusd-data/data
       - user-data:/static
-    restart: always
+    restart: unless-stopped
     depends_on:
       redis:
         condition: service_started
@@ -81,7 +79,7 @@ services:
       - celery-data:/var/run/celery
       - tusd-data:/srv/tusd-data/data
       - user-data:/static
-    restart: always
+    restart: unless-stopped
     depends_on:
       redis:
         condition: service_started
@@ -97,12 +95,11 @@ services:
 
   proxy:
     image: d2s-proxy:dev
-    platform: linux/x86_64
     tmpfs:
       - /tmp
     ports:
       - "0.0.0.0:8000:80"
-    restart: always
+    restart: unless-stopped
     depends_on:
       - frontend
 
@@ -121,12 +118,9 @@ services:
 
   pg_tileserv:
     image: pramsey/pg_tileserv:latest
-    platform: linux/x86_64
     volumes:
       - ./pg_tileserv.toml:/config/pg_tileserv.toml:ro
-    ports:
-      - 7800:7800
-    restart: always
+    restart: unless-stopped
     depends_on:
       db:
         condition: service_healthy
@@ -175,7 +169,7 @@ services:
     volumes:
       - tusd-data:/srv/tusd-data/data
       - user-data:/static
-    restart: always
+    restart: unless-stopped
     depends_on:
       frontend:
         condition: service_started
@@ -189,6 +183,5 @@ services:
 volumes:
   celery-data:
   db-data:
-  log-data:
   user-data:
   tusd-data:

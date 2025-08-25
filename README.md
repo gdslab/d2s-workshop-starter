@@ -53,7 +53,6 @@ These files are provided and ready to use:
    ```
 3. Access the application
    - App via proxy: `http://localhost:8000`
-   - Vector tiles (pg_tileserv): `http://localhost:7800`
 4. Verify services
    ```bash
    docker compose ps
@@ -90,7 +89,7 @@ These files are provided and ready to use:
 
 ## Troubleshooting
 
-- Ports already in use (8000 or 7800)
+- Ports already in use (8000)
   - Stop the other process or container using the port, then re-run
     `docker compose up -d`.
 - Docker Compose command not found
