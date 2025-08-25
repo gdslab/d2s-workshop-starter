@@ -1,6 +1,6 @@
 services:
   frontend:
-    image: d2s-app:latest
+    image: gdslab/d2s-app:latest
     restart: unless-stopped
     depends_on:
       - backend
@@ -8,7 +8,7 @@ services:
       - frontend.env
 
   backend:
-    image: d2s-api:latest
+    image: gdslab/d2s-api:latest
     platform: linux/x86_64
     volumes:
       - tusd-data:/srv/tusd-data/data
@@ -49,7 +49,7 @@ services:
     restart: unless-stopped
 
   celery_worker:
-    image: d2s-api:latest
+    image: gdslab/d2s-api:latest
     platform: linux/x86_64
     command: /app/celery/worker-start.sh
     volumes:
@@ -71,7 +71,7 @@ services:
       - TILE_SIGNING_SECRET_KEY=${TILE_SIGNING_SECRET_KEY}
 
   celery_beat:
-    image: d2s-api:latest
+    image: gdslab/d2s-api:latest
     platform: linux/x86_64
     command: /app/celery/beat-start.sh
     volumes:
@@ -93,7 +93,7 @@ services:
       - TILE_SIGNING_SECRET_KEY=${TILE_SIGNING_SECRET_KEY}
 
   proxy:
-    image: d2s-proxy:dev
+    image: gdslab/d2s-proxy:dev
     tmpfs:
       - /tmp
     ports:
@@ -103,7 +103,7 @@ services:
       - frontend
 
   varnish:
-    image: d2s-varnish:latest
+    image: gdslab/d2s-varnish:latest
     tmpfs:
       - /var/lib/varnish/varnishd:exec
     command: "-p default_keep=300"
