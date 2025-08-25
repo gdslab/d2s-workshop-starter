@@ -1,7 +1,6 @@
 services:
   frontend:
     image: d2s-app:latest
-    platform: linux/x86_64
     restart: unless-stopped
     depends_on:
       - backend

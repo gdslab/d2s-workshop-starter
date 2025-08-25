@@ -42,7 +42,7 @@ These files are provided and ready to use:
 
 1. Clone this repository
    ```bash
-   git clone https://github.com/<your-org>/d2s-workshop-starter.git
+   git clone https://github.com/gdslab/d2s-workshop-starter.git
    cd d2s-workshop-starter
    ```
 2. Launch the stack
