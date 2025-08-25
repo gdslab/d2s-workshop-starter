@@ -1,0 +1,194 @@
+services:
+  frontend:
+    image: d2s-app:latest
+    platform: linux/x86_64
+    restart: always
+    depends_on:
+      - backend
+    env_file:
+      - frontend.env
+
+  backend:
+    image: d2s-api:latest
+    platform: linux/x86_64
+    volumes:
+      - tusd-data:/srv/tusd-data/data
+      - user-data:/static
+    restart: always
+    depends_on:
+      db:
+        condition: service_healthy
+      tusd-init:
+        condition: service_completed_successfully
+    environment:
+      - TILE_SIGNING_SECRET_KEY=${TILE_SIGNING_SECRET_KEY}
+    env_file:
+      - backend.env
+      - db.env
+
+  db:
+    image: postgis/postgis:15-3.3
+    platform: linux/x86_64
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    restart: always
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready --username=$$POSTGRES_USER --dbname=$$POSTGRES_DB",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    environment:
+      - PGTZ=Etc/UTC
+    env_file:
+      - db.env
+
+  redis:
+    image: redis:alpine
+    platform: linux/x86_64
+    restart: always
+
+  celery_worker:
+    image: d2s-api:latest
+    platform: linux/x86_64
+    command: /app/celery/worker-start.sh
+    volumes:
+      - tusd-data:/srv/tusd-data/data
+      - user-data:/static
+    restart: always
+    depends_on:
+      redis:
+        condition: service_started
+      db:
+        condition: service_healthy
+      tusd-init:
+        condition: service_completed_successfully
+    env_file:
+      - backend.env
+      - db.env
+    environment:
+      - CELERY_WORKERS=4
+      - TILE_SIGNING_SECRET_KEY=${TILE_SIGNING_SECRET_KEY}
+
+  celery_beat:
+    image: d2s-api:latest
+    platform: linux/x86_64
+    command: /app/celery/beat-start.sh
+    volumes:
+      - celery-data:/var/run/celery
+      - tusd-data:/srv/tusd-data/data
+      - user-data:/static
+    restart: always
+    depends_on:
+      redis:
+        condition: service_started
+      db:
+        condition: service_healthy
+      tusd-init:
+        condition: service_completed_successfully
+    env_file:
+      - backend.env
+      - db.env
+    environment:
+      - TILE_SIGNING_SECRET_KEY=${TILE_SIGNING_SECRET_KEY}
+
+  proxy:
+    image: d2s-proxy:dev
+    platform: linux/x86_64
+    tmpfs:
+      - /tmp
+    ports:
+      - "0.0.0.0:8000:80"
+    restart: always
+    depends_on:
+      - frontend
+
+  varnish:
+    image: d2s-varnish:latest
+    tmpfs:
+      - /var/lib/varnish/varnishd:exec
+    command: "-p default_keep=300"
+    depends_on:
+      - pg_tileserv
+      - proxy
+      - titiler
+    environment:
+      - TILE_SIGNING_SECRET_KEY=${TILE_SIGNING_SECRET_KEY}
+      - VARNISH_SIZE=2G
+
+  pg_tileserv:
+    image: pramsey/pg_tileserv:latest
+    platform: linux/x86_64
+    volumes:
+      - ./pg_tileserv.toml:/config/pg_tileserv.toml:ro
+    ports:
+      - 7800:7800
+    restart: always
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file:
+      - db.env
+
+  titiler:
+    image: ghcr.io/developmentseed/titiler:0.19.0
+    volumes:
+      - user-data:/static
+    environment:
+      # Application
+      - HOST=0.0.0.0
+      - PORT=8888
+      # Gunicorn / Uvicorn
+      # https://github.com/tiangolo/uvicorn-gunicorn-docker#web_concurrency
+      # - WEB_CONCURRENCY=1
+      - ACCESS_LOG=/var/log/titiler-access.log
+      - ERROR_LOG=/var/log/titiler-error.log
+      # https://github.com/tiangolo/uvicorn-gunicorn-docker#workers_per_core
+      - WORKERS_PER_CORE=1
+      # GDAL config
+      - CPL_TMPDIR=/tmp
+      - GDAL_CACHEMAX=75%
+      - GDAL_INGESTED_BYTES_AT_OPEN=32768 # 32KiB
+      - GDAL_DISABLE_READDIR_ON_OPEN=EMPTY_DIR
+      - GDAL_HTTP_MERGE_CONSECUTIVE_RANGES=YES
+      - GDAL_HTTP_MULTIPLEX=YES
+      - GDAL_HTTP_VERSION=2
+      - PYTHONWARNINGS=ignore
+      - VSI_CACHE=TRUE
+      - VSI_CACHE_SIZE=536870912 # 512MiB
+      - CPL_VSIL_CURL_ALLOWED_EXTENSIONS=.tif,.TIF,.tiff
+      - CPL_VSIL_CURL_CACHE_SIZE=200000000 # 200MB
+
+  tusd-init:
+    image: alpine:3.19
+    command: sh -c "mkdir -p /srv/tusd-data/data && chown -R 1000:1000 /srv/tusd-data/data"
+    volumes:
+      - tusd-data:/srv/tusd-data/data
+    restart: "no"
+
+  tusd:
+    image: tusproject/tusd:latest
+    command: -verbose -behind-proxy -hooks-http http://proxy/api/v1/tusd -hooks-http-forward-headers Cookie X-Project-ID X-Flight-ID X-Data-Type
+    volumes:
+      - tusd-data:/srv/tusd-data/data
+      - user-data:/static
+    restart: always
+    depends_on:
+      frontend:
+        condition: service_started
+      backend:
+        condition: service_started
+      proxy:
+        condition: service_started
+      tusd-init:
+        condition: service_completed_successfully
+
+volumes:
+  celery-data:
+  db-data:
+  log-data:
+  user-data:
+  tusd-data:
